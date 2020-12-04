@@ -10,9 +10,13 @@
         d’abondance](#transformation-de-la-valeur-dabondance)
       - [Sous-ensembles par taxonomie](#sous-ensembles-par-taxonomie)
       - [Preprocessing](#preprocessing)
+  - [Differentes projections
+    d’ordination](#differentes-projections-dordination)
       - [PCA sur les rangs](#pca-sur-les-rangs)
       - [Canonical correspondence](#canonical-correspondence)
   - [Supervised learning](#supervised-learning)
+  - [Graphbased analysis](#graphbased-analysis)
+      - [Creating and ploting graphs](#creating-and-ploting-graphs)
   - [Graph-based two-sample test](#graph-based-two-sample-test)
       - [Minimum spanning tree](#minimum-spanning-tree)
       - [Nearest neighbors](#nearest-neighbors)
@@ -25,9 +29,9 @@
 
 ## Chargement des données
 
-On charge les données disponible à l’url indiquée dans la ligne de code,
-et on l’assigne à la variable “ps\_connect”. Puis on utilise la fonction
-’readRDS()" pour lire les données et les assignées à “ps”.
+On charge les données disponibles à l’url indiqué dans la ligne de code,
+et on les assigne à la variable “ps\_connect”. Puis on utilise la
+fonction “readRDS()” pour lire les données et les assignées à “ps”.
 
 ``` r
 ps_connect <-url("https://raw.githubusercontent.com/spholmes/F1000_workflow/master/data/ps.rds")
@@ -164,8 +168,11 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(ps),color=Phylum)) +
   facet_wrap(~Phylum) + theme(legend.position="none")
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-9-1.png)<!-- --> Dans les
-graphiques affichés, chaque point est un taxon.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+Dans les graphiques affichés, chaque point est un taxon. La ligne noir
+en pointillée est à 5% de prévalence. On va exclure les points
+inférieurs à ce seuil dans les étapes suivantes.
 
 On définit la prévalence à 5% du total des échantillons.
 
@@ -196,15 +203,15 @@ length(get_taxa_unique(ps2, taxonomic.rank = "Genus"))
 
     ## [1] 49
 
-La fonction “tax\_glom()” sert à agglomérer les taxons du même type sans
-utiliser de distance phylogénétique, mais par genre.
+La fonction “tax\_glom()” sert à agglomérer les taxons du même type. Ici
+on l’applique sans utiliser de distance phylogénétique, mais par genre.
 
 ``` r
 ps3 = tax_glom(ps2, "Genus", NArm = TRUE)
 ```
 
 La fonction “tip\_glom()” va agglomérer les taxons selon la distance
-phylogénétique. Ici la distance doit êtrre en-dessous de h1=0.4.
+phylogénétique. Ici la distance doit être en-dessous de h1=0.4.
 
 ``` r
 h1 = 0.4
@@ -242,11 +249,12 @@ library(gridExtra); packageVersion("gridExtra")
 grid.arrange(nrow = 1, p2tree, p3tree, p4tree)
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- --> Avant
-agglomération il y a trop de branches pour pouvoir lire l’arbre comme il
-faut, les deux arbres agglomérés sont plus clairs. On peut tirer
-différentes interprétations, mais ici on n’a pas codé pour avoir les
-noms des taxons.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+
+Avant agglomération il y a trop de branches pour pouvoir lire l’arbre
+comme il faut, les deux arbres agglomérés sont plus clairs. On peut
+tirer différentes interprétations, mais ici on n’a pas codé pour avoir
+les noms des taxons.
 
 ## Transformation de la valeur d’abondance
 
@@ -288,11 +296,12 @@ plotAfter = plot_abundance(ps3ra,"")
 grid.arrange(nrow = 2,  plotBefore, plotAfter)
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-19-1.png)<!-- --> On
-observe mieux l’abondance des graphs modifiés, en effet, les données
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
+On observe mieux l’abondance des graphs modifiés, en effet, les données
 sont mieux réparties. Contrairement à avant modification, où les données
 sont un peu “écrasées” en bas des graphs. Ainsi on voit bien que les
-microbiotes diffèrent en fonction du sexe de l’hôte. on peut aussi
+microbiotes diffèrent en fonction du sexe de la souris. On peut aussi
 remarquer 2 modules d’abondance relative pour certaines espèces, comme
 Lactobacillus.
 
@@ -307,12 +316,13 @@ psOrd = subset_taxa(ps3ra, Order == "Lactobacillales")
 plot_abundance(psOrd, Facet = "Genus", Color = NULL)
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-20-1.png)<!-- --> On voit
-bien que l’abondance bi-modulaire observée précédemment est due à deux
-genre: Lactobacillu et Streptococcus. Lactobacillus étant plus abondant
-chez les deux types d’hôte.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
-Maintenant que l’on a filtré et transformé nos données, on va opuvoir
+On voit bien que l’abondance bi-modulaire observée précédemment est due
+à deux genre: Lactobacillu et Streptococcus. Lactobacillus étant plus
+abondant chez les deux types d’hôte.
+
+Maintenant que l’on a filtré et transformé nos données, on va pouvoir
 commencer à faire des analyses statistiques. Mais avant cela, nous
 devons traiter les données une dernière fois.
 
@@ -325,8 +335,9 @@ pour plotter les ages des souris.
 qplot(sample_data(ps)$age, geom = "histogram",binwidth=20) + xlab("age")
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-21-1.png)<!-- --> On
-observe trois groupes d’age distincts.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+
+On observe trois groupes d’age distincts.
 
 On fait un histogramme du log des données d’abondance.
 
@@ -336,6 +347,7 @@ qplot(log10(rowSums(otu_table(ps))),binwidth=0.2) +
 ```
 
 ![](03_phyloseq_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
 Normaliser les données d’abondance par un log(1+x) serait donc suffisant
 pour les futures analyses.
 
@@ -360,7 +372,7 @@ out.wuf.log <- ordinate(pslog, method = "MDS", distance = "wunifrac")
 ```
 
     ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## CCGAGCGTTGTCCGGATTTATTGGGCGTAAAGCGAGCGCAGGCGGTTAGATAAGTCTGAAGTTAAAGGCTGTGGCTTAACCATAGTAGGCTTTGGAAACTGTTTAACTTGAGTGCAAGAGGGGAGAGTGGAATTCCATGTGTAGCGGTGAAATGCGTAGATATATGGAGGAACACCGGTGGCGAAAGCGGCTCTCTGGCTTGTAACTGACGCTGAGGCTCGAAAGCGTGGGGAGC
+    ## GCAAGCGTTATCCGGATTTACTGGGTGTAAAGGGCGTGTAGGCGGGAGTGCAAGTCAGATGTGAAAACTATGGGCTCAACCCATAGCCTGCATTTGAAACTGTACTTCTTGAGTGCTGGAGAGGCAATCGGAATTCCGTGTGTAGCGGTGAAATGCGTAGATATACGGAGGAACACCAGTGGCGAAGGCGGATTGCTGGACAGTAACTGACGCTGAGGCGCGAAAGCGTGGGGAG
     ## -- in the phylogenetic tree in the data you provided.
 
 ``` r
@@ -370,8 +382,9 @@ plot_ordination(pslog, out.wuf.log, color = "age_binned") +
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-23-1.png)<!-- --> On
-remarque quelques valeurs abérrantes.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+
+On remarque quelques valeurs abérrantes.
 
 On vérifie donc l’abondance relative de ces données abérrantes.
 
@@ -381,11 +394,12 @@ qplot(rel_abund[, 12], geom = "histogram",binwidth=0.05) +
   xlab("Relative abundance")
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-24-1.png)<!-- --> On
-observe des abondances relatives bien plus hautes que pour le reste des
-échantillons.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
 
-\#Differentes projections d’ordination
+On observe des abondances relatives bien plus hautes que pour le reste
+des échantillons.
+
+# Differentes projections d’ordination
 
 On assigne donc les échantillons abérrants à une variable “outliers”,
 que l’on utilise avec la fonction “prune\_samples()” pour les enlever du
@@ -431,8 +445,9 @@ plot_ordination(pslog, out.pcoa.log, color = "age_binned",
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-28-1.png)<!-- --> On
-remarque que l’age a un effet important, peu importe le sexe ou la
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+
+On remarque que l’age a un effet important, peu importe le sexe ou la
 portée.
 
 Maintenant on va faire une analyse DPCoA, qui est une méthode
@@ -449,8 +464,9 @@ plot_ordination(pslog, out.dpcoa.log, color = "age_binned", label= "SampleID",
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-29-1.png)<!-- --> On
-remarque une forme alongée horizontale, ce qui traduit d’une grande
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+
+On remarque une forme alongée horizontale, ce qui traduit d’une grande
 diversité venant de l’axe 1.
 
 On plot donc en fonction des espèces et phylum pour comprendre les
@@ -461,10 +477,11 @@ plot_ordination(pslog, out.dpcoa.log, type = "species", color = "Phylum") +
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-30-1.png)<!-- --> On
-remarque que les Firmicutes et les Bactéroides sont les taxons
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+
+On remarque que les Firmicutes et les Bactéroides sont les taxons
 responsable du pourcentage de l’axe 1. Le reste des taxons étant plutôt
-groupé.
+groupés.
 
 On regarde ensuite le résultat d’une PCoA avec “wunifrac” (weighted
 UniFrac). On utilise donc toujours la fonction “ordinate()” puis
@@ -475,7 +492,7 @@ out.wuf.log <- ordinate(pslog, method = "PCoA", distance ="wunifrac")
 ```
 
     ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## GCAAGCGTTGTCCGGATTTACTGGGTGTAAAGGGCGTGCAGCCGGAGAGACAAGTCAGATGTGAAATCCACGGGCTCAACCCGTGAACTGCATTTGAAACTGTTTCCCTTGAGTGTCGGAGAGGTAATCGGAATTCCTTGTGTAGCGGTGAAATGCGTAGATATAAGGAAGAACACCAGTGGCGAAGGCGGATTACTGGACGATAACTGACGGTGAGGCGCGAAAGCGTGGGGAG
+    ## GCAAGCGTTATCCGGATTTACTGGGTGTAAAGGGCGTGTAGGCGGGCATGCAAGCCAGAAGTGAAATCTGGGGGCTTAACCCCCAAACTGCTTTTGGAACTGCGTGTCTTGAGTGATGGAGAGGCAGGCGGAATTCCCAGTGTAGCGGTGAAATGCGTAGATATTGGGAGGAACACCAGTGGCGAAGGCGGCCTGCTGGACATTAACTGACGCTGAGGCGCGAAAGCGTGGGGAG
     ## -- in the phylogenetic tree in the data you provided.
 
 ``` r
@@ -486,8 +503,9 @@ plot_ordination(pslog, out.wuf.log, color = "age_binned",
   labs(col = "Binned Age", shape = "Litter")
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-31-1.png)<!-- --> On voit
-bien qu’il y a toujours une influence de l’age lié à l’axe 2.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
+
+On voit bien qu’il y a toujours une influence de l’age lié à l’axe 2.
 
 ## PCA sur les rangs
 
@@ -558,8 +576,9 @@ ggplot(abund_df %>%
   scale_color_brewer(palette = "Set2")
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-34-1.png)<!-- --> On
-observe une tendance similaire pour les différents échantillons, avec
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
+
+On observe une tendance similaire pour les différents échantillons, avec
 une abondance qui augmente progressivement.
 
 On va maintenant faire une PCA. Pour cela on utilise la fonction
@@ -616,8 +635,9 @@ ggplot() +
   theme(panel.border = element_rect(color = "#787878", fill = alpha("white", 0)))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-36-1.png)<!-- --> On
-obtient 3 graphiques en nuage de point, un par groupe d’age. Les deux
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-36-1.png)<!-- -->
+
+On obtient 3 graphiques en nuage de point, un par groupe d’age. Les deux
 axes représente un certain pourcentage de variance, à peu près égal
 (axis1=6.78% et axis2=4.14%). Les points colorés représentes les
 principaux ordres taxonomiques (et le reste des ordres dans other). Et
@@ -681,8 +701,9 @@ ggplot() +
   theme(panel.border = element_rect(color = "#787878", fill = alpha("white", 0)))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-38-1.png)<!-- --> On
-obtient deux graphiques en nuage de points générés par CCpnA, un par
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
+
+On obtient deux graphiques en nuage de points générés par CCpnA, un par
 portée. Chaque axe présente un certain pourcentage de variance
 (axe1=7.52% et axe2=4.42%). Les ronds colorés correspondent aux ordres
 principaux. Et les triangles correspondent aux sites. On observe donc un
@@ -726,8 +747,8 @@ table(plsClasses, testing$age)
 
     ##            
     ## plsClasses  (0,100] (100,400]
-    ##   (0,100]        70         2
-    ##   (100,400]       4        45
+    ##   (0,100]        64         2
+    ##   (100,400]       2        44
 
 La prédiction est bonne, avec seulement 2/109 d’erreur.
 
@@ -766,8 +787,8 @@ table(rfClasses, testing$age)
 
     ##            
     ## rfClasses   (0,100] (100,400]
-    ##   (0,100]        73         1
-    ##   (100,400]       1        46
+    ##   (0,100]        64         2
+    ##   (100,400]       2        44
 
 Le résultat de la prédiction est aussi très bon, avec 1/109 erreur.
 
@@ -828,13 +849,14 @@ ggplot() +
   theme(panel.border = element_rect(color = "#787878", fill = alpha("white", 0)))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-44-1.png)<!-- --> Le
-graphique en nuage de points est séparé en deux, pour les deux tranches
-d’age. Avec les ronds colorés pour les ordres principaux, et les
-triangles pour les scores. On remarque que les ronds de tranches d’age
-forme deux groupes bien centrés. Et les triangles sont bien groupé pour
-la tranche d’age entre 100 et 400, et un peu plus dispersée pour la
-tranche entre 0 et 100.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
+
+Le graphique en nuage de points est séparé en deux, pour les deux
+tranches d’age. Avec les ronds colorés pour les ordres principaux, et
+les triangles pour les scores. On remarque que les ronds de tranches
+d’age forme deux groupes bien centrés. Et les triangles sont bien
+groupé pour la tranche d’age entre 100 et 400, et un peu plus dispersée
+pour la tranche entre 0 et 100.
 
 Ensuite on fait le graph pour “randomForest”.
 
@@ -850,8 +872,9 @@ ggplot(rf_prox) +
   labs(col = "Binned Age", x = "Axis1", y = "Axis2")
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-45-1.png)<!-- --> On
-remarque bien que les tranches d’age, ronds colorés, sont nettement
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+
+On remarque bien que les tranches d’age, ronds colorés, sont nettement
 séparé en deux ilots pour les Young100 et les Mid100to200. Avec
 quelques points dispersés entre les deux, appartenant aux trois tranches
 d’age.
@@ -880,18 +903,20 @@ ggplot(maxImpDF) +   geom_histogram(aes(x = abund)) +
 
     ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-47-1.png)<!-- --> On
-observe que dans la tranche entre 0 et 100 jours, l’abondance est très
-basse, avec presque tous les échantillons en dessous de 1. Au contraire
-de la tranche entre 100 et 400 jours, où l’abondance des échantillons
-est entre 1 et 3.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-47-1.png)<!-- -->
 
-\#Graphbased analysis
+On observe que dans la tranche entre 0 et 100 jours, l’abondance est
+très basse, avec presque tous les échantillons en dessous de 1. Au
+contraire de la tranche entre 100 et 400 jours, où l’abondance des
+échantillons est entre 1 et 3.
 
-\#\#creating and ploting graphs On créé un réseau avec la fonction
-“make\_network()” avec le maximum de la distance de Jaccard à 0.35.
-Puis on attribut de quel souris et quelle portée
-(“family\_relationship”) viennent les échantillons. Ainsi on peut
+# Graphbased analysis
+
+## Creating and ploting graphs
+
+On créé un réseau avec la fonction “make\_network()” avec le maximum de
+la distance de Jaccard à 0.35. Puis on attribut de quel souris et quelle
+portée (“family\_relationship”) viennent les échantillons. Ainsi on peut
 retracer les échantillons dans le réseau.
 
 ``` r
@@ -947,11 +972,12 @@ ggplot(net_graph, aes(x = x, y = y, xend = xend, yend = yend), layout = "fruchte
   guides(col = guide_legend(override.aes = list(size = .5)))
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-50-1.png)<!-- --> Dans le
-réseau obtenu, les portées sont des ronds (Litter1) ou des triangle
-(Litter2), et en couleur sont les différentes souris. On observe un
-réseau connecté de souris et de portées, et des petits groupes
-périphériques connecté par la portée.
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-50-1.png)<!-- -->
+
+Dans le réseau obtenu, les portées sont des ronds (Litter1) ou des
+triangle (Litter2), et en couleur sont les différentes souris. On
+observe un réseau connecté de souris et de portées, et des petits
+groupes périphériques connecté par la portée.
 
 # Graph-based two-sample test
 
@@ -968,7 +994,7 @@ gt <- graph_perm_test(ps, "family_relationship", grouping = "host_subject_id",
 gt$pval
 ```
 
-    ## [1] 0.004
+    ## [1] 0.002
 
 On obtient une p.value de 0.004, on rejette donc l’hypothèse qu’elles
 viennent de la même distribution.
@@ -984,9 +1010,10 @@ plotPerm1=plot_permutations(gt)
 grid.arrange(ncol = 2,  plotNet1, plotPerm1)
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-52-1.png)<!-- --> L’arbre
-de portée minimale lie les différentes portées, ronds rouge et bleu,
-avec des arrêtes continues, pure, ou en pointillé, mixe. Les liens
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-52-1.png)<!-- -->
+
+L’arbre de portée minimale lie les différentes portées, ronds rouge et
+bleu, avec des arrêtes continues, pure, ou en pointillé, mixe. Les liens
 mixtes signifient qu’il y aurait une distribution similaire pour les
 deux portées. Or on observe que les portées sont principalement pure,
 comme le confirme aussi l’histogramme. On a pu observé le résultat de la
@@ -1012,8 +1039,9 @@ plotPerm2=plot_permutations(gt)
 grid.arrange(ncol = 2,  plotNet2, plotPerm2)
 ```
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-54-1.png)<!-- --> La
-légende est la même qu’au précédent graphique. On observe qu’il est
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-54-1.png)<!-- -->
+
+La légende est la même qu’au précédent graphique. On observe qu’il est
 extrêment probable que les voisins les plus proches soient de la même
 portée.
 
@@ -1100,8 +1128,9 @@ ggplot(ps_samp %>% left_join(new_data)) +
 
     ## Joining, by = c("host_subject_id", "age_binned")
 
-![](03_phyloseq_files/figure-gfm/unnamed-chunk-58-1.png)<!-- --> On
-observe que 4 souris font parti de la portée 1, les 8 autres de la
+![](03_phyloseq_files/figure-gfm/unnamed-chunk-58-1.png)<!-- -->
+
+On observe que 4 souris font parti de la portée 1, les 8 autres de la
 portée 2. On n’observe pas de flagrante différence de diversité entre
 les deux portées, ni en fonction de l’age. Les barres d’erreur se
 chevauchent à chaque fois.
@@ -1309,9 +1338,10 @@ ggplot(abund_sums) +
 ```
 
 ![](03_phyloseq_files/figure-gfm/unnamed-chunk-61-1.png)<!-- -->
+
 L’histogramme du haut est celui avec les modifications que l’on vient
-d’apporter, et celui du bas est celui avec les données non-modifiées. On
-observe que l’abondance totale des échantillon a augmenté.
+d’apporter, et celui du bas est celui avec les données non-modifiées.
+On observe que l’abondance totale des échantillon a augmenté.
 
 On utilise la fonction “treePValues()” pour faire un arbre avec les
 p.values des espèces abondantes.
@@ -1544,3 +1574,6 @@ d’échantillon, ST ou PD. Il semble aussi y avoir une différence de
 variance entre les métabollites et les microbes.
 
 # Conclusion
+
+On a donc utilisé Phyloseq pour débruiter, identifier, et normaliser des
+reads avec des models probabilistiques adaptés.
