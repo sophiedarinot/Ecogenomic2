@@ -1,29 +1,49 @@
 ---
 title: "Dada2 tutorial"
 output:  
-  git_document:
+  github_document:
     toc: true
     toc_depth: 2
 ---
+# On débute
+
+On charge dada2
 ```{r}
 library("dada2")
 ```
+
+On créé un chemin vers le répertoir MiSeq-SOP contenant les dossiers fastq du séquençage.
 ```{r}
-path <- "~/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
+path <- "~/MiSeq_SOP" 
 list.files(path)
 ```
+
+On lit les fichiers fastq, dans ceux-ci les séquences Forward et Reverses sont toutes ensembles, leurs noms ont un format spécifique: . 
+Donc on met les séquences Forward à la variable fnFs, et les Reverses à la variable fnRs.
+Pour se faire, avec la fonction sort, on cherche tous les Forwards, qui ont "_R1_001.fastq" à la fin de leurs noms, et on les affecte à fnFs. Et les Reverse, qui ont "_R2_001.fastq" à la fin de leurs noms, sont affectés à fnRs.
+Puis on utilise la fonction "strsplit" pour découper le noms des séquences et ne garder que leur identifiant. Et la fonction "sapply" permet d'appliquer cela à toute le fichier. Ces noms sont affecté à la variable "sample.names".
 ```{r}
-# Forward and reverse fastq filenames have format: SAMPLENAME_R1_001.fastq and SAMPLENAME_R2_001.fastq
 fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
 fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
-# Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+
 sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 ```
 
+# On inspecte les profils de qualité de lecture
+
+On visualise les profils de qualité de lecture des reads Forward sous forme de graphique avec la fonction "plotQualityProfile".
+Le "1:4" prend les quatre premiers reads.
 ```{r}
 plotQualityProfile(fnFs[1:4])
 ```
+On a donc les scores de qualité en ordonnée, en abscisse, la position sur la séquence. En illumina on utilise 250 paires de base, c'est pour ça que ça va jusqu'à 250. 
+La fréquence est représentée en gris par une Heatmap, plus haute est la fréquence, plus foncé est le gris. La ligne verte montre la moyenne, la orange la médiane, et la orange pointillée les premier et troisième quartiles. 
 
+On observe donc un bon score de qualité (>30),à peu près constant, excepté pour la dernière dizaine de nucléotides, où le score diminue quelque peu. Il faudra peut-être couper ses derniers nucléotides pour minimiser les erreurs.
+
+# On filtre et coupe
+
+Tout d'abord, on créé des variables pour les fichiers que l'on va filtrer. Une variable pour les Forwards et une pour les Reverses. La fonction "file.path" indiquant le chemin à suivre pour que les séquences y soient assignées.
 ```{r}
 filtFs <- file.path(path,"filtered", paste0(sample.names, "_F_filt.fasta.gz"))
 filtRs <- file.path(path,"filtered", paste0(sample.names, "_R_filt.fasta.gz"))
@@ -31,156 +51,168 @@ names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 ```
 
+Ensuite, on utilise la fonction "filterAndTrim" pour couper et faire le tri. Elle est appliquée aux variables fnFs, filtFs, fnRs, et filtRs. les reads Forward sont coupé au 240ème nucléotides, et les Reverses au 160ème nucléotides, leurs scores de qualités diminuant après. On applique les paramètres de filtration standards, avec "maxEE" le nombre d'erreur attendues maximum à 2. Tous ces fichiers filtrés sont assignés à out.
+On montre ensuite le début de out avec la fonction "head".
 ```{r}
-out <- filterAndTrim(fnFs,filtFS, fnRs, filtRs, truncLen = c(240,160),maxN = 0, maxEE = c(2,2),truncQ = 2, rm.phix = TRUE, compress = TRUE, multithread = TRUE) #out va recevoir tous les fichiers filtrés
-head(out) #montre la tête du fichier
+out <- filterAndTrim(fnFs,filtFs, fnRs, filtRs, truncLen = c(240,160),maxN = 0, maxEE = c(2,2),truncQ = 2, rm.phix = TRUE, compress = TRUE, multithread = TRUE) 
+head(out)
 ```
 
+# On apprend les taux d'erreurs
+
+On va calculer le modèle de taux d'erreurs pour notre set de données avec la fonction "learnErrors". Pour se faire, un taux maximal est choisi initialement, et en fonction de l'échantillon il est modifié jusqu'à atteindre un taux consistent.errF est la variable pour les Forward.
 ```{r}
 errF <- learnErrors(filtFs, multithread = TRUE)
 ```
 
+Et errR, la variable pour les Reverses.
 ```{r}
 errR <- learnErrors(filtRs, multithread = TRUE)
 ```
 
+On vérifie visuellement :
 ```{r}
 plotErrors(errF, nominalQ = TRUE)
 #proba mutation fct Q score considéré
 #proba d'erreur de seq (ex: un A changé en C) fct du Q score
 ``` 
+Ici, la probabilité de mutation d'une base à une autre est observée en fonction du score de qualité.La ligne noir représente le taux d'erreurs calculé précédement, la ligne rouge le taux d'erreurs initial d'après le score de qualité, et les points sont les erreurs observées.
 
+On observe que les taux d'erreur calculés (lignes noires) correspondent bien avec les erreurs observées (points). De plus le taux d'erreur diminue quand le score de qualité augmente. Donc on peut continuer.
 
+# Inférence d'échantillon
+
+Avec la fonction "dada", les séquences abondantes sont gardées pour les reads, et les séquences en-dessous d'un seuil d'abondance, déterminé par le taux d'erreur, ne sont pas gardées. Les séquences Forward gardées sont affectées à la variable dadaFs.
 ```{r}
 dadaFs <- dada(filtFs, err=errF, multithread= TRUE)
 ```
-
+Les séquences Reverse gardées sont affectées à la variable dadaRs.
 ```{r}
 dadaRs <- dada(filtRs, err=errR, multithread = TRUE)
 ```
 
+On appelle le premier objet de dadaFs. C'est le "dada-class", qui montre le résultat du débruitage effectué précédement. Ici, 128 variants de séquence depuis 1979 séquences uniques dans le premier échantillon.
 ```{r}
 dadaFs[[1]]
 ```
-aligner les R1 et R2 en contigs
+
+# On lie les paires de reads
+
+Avec la fonction "mergePairs", on aligne les reads Forward et Reverse, qui ont été débruité, pour faire des contigs. Ces contigs sont assignés à la variable mergers, dont on montre le début avec la fonction "head()".
 ```{r}
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose = TRUE)
-#inspect the merger data.fram from the first sample
+
 head(mergers[[1]])
 ```
-#construction de la table d'observtion
+
+# On construit la table d'observation
+
+On utilise la fonction "makeSequenceTable" pour construire un tableau de séquence variant d'amplicon, à partir des contigs formé plutôt. Ce qui est plus précis qu'un tableau d'OTU. Le tableau est dans la variable seqtab. Et on utilise "dim" pour avoir la dimension du tableau.
 ```{r}
 seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
 ```
-
+On observe la distribution de la longueur des séquences avec la fonction "nchar()".
 ```{r}
 table(nchar(getSequences(seqtab)))
 #inspect distribution os sequences lengths
 ```
+La matrice contient 293 ASVs, et la longueur de séquences fusionnées est entre 252 et 253, ce qui était attendu.
 
+# On retirre les chimères
+
+Malgré que les erreurs soient filtrées, des chimères peuvent rester. En utilisant la fonction "remove BimeraDenovo()" avec la méthode "consensus", les chimères sont détectées quand il y a des bimeras. C'est à dire quand en assemblant les séquences les plus abondantes, on peut reconstuire à l'identique la séquence chimérique.
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread= TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 ```
+61 bimeras ont été identifiées, il reste 20 232 séquences.
 
+On calcul la fréquence de séquence chimérique.
 ```{r}
 sum(seqtab.nochim)/sum(seqtab)
 ```
+Celle-ci est de O.964. 
 
-#résumé des filtres appliqués
+# Track reads through the pipeline
+
+On regarde le nombre de reads après chaque étape.
 ```{r}
 getN <- function(x) sum(getUniques(x))
 track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
-#if processing a single sample, remove the sapply calls: e.g. replace sapply (dadaFs, getN) with getN(dadaFs)
 colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
 rownames(track) <- sample.names
 head(track)
 ```
+Il n'y a pas eu trop de perte.C'est bon signe.
 
-```{bash}
-cd $HOME
-wget https://zenodo.org/record/3986799/files/silva_nr99_v138_train_set.fa.gz
-```
+# On assigne la taxonomie
 
-```{r}
-taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
-```
-
+On charge les données silva.
 ```{bash}
 cd $HOME
 wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
+```
+
+Puis on utilise la fonction "assignTaxonomy()" pour assigner la taxonomie du fichier téléchargé à la table de séquences sans chimère.
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multithread = TRUE)
 ```
 
 ```{r}
 taxa <- addSpecies(taxa, "~/silva_species_assignment_v138.fa.gz")
 ```
 
+On regarde le résultat de l'assignation.
 ```{r}
-taxa.print <- taxa # Removing sequence rownames for display only
+taxa.print <- taxa
 rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
+Les Bacteroides sont dans le taxon le plus abondant. Beaucoup d'espèces n'ont pas été assignées car il est difficile avec du 16s de ne pas avoir des assignations ambigues, de plus le microbiote des intestin de souris n'est pas assez bien référencé dans les bases de données.
 
-```{r}
-if (!requireNamespace("BiocManager", quietly=TRUE))
-    install.packages("BiocManager")
-BiocManager::install("DECIPHER")
-```
+# Evaluate accuracy
 
-```{r}
-library(DECIPHER); packageVersion("DECIPHER")
-```
-
-```{r}
-dna <- DNAStringSet(getSequences(seqtab.nochim)) # Create a DNAStringSet from the ASVs
-load("~/silva_nr99_v138_train_set.fa.gz") # CHANGE TO THE PATH OF YOUR TRAINING SET
-ids <- IdTaxa(dna, trainingSet, strand="top", processors=NULL, verbose=FALSE) # use all processors
-ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species") # ranks of interest
-# Convert the output object of class "Taxa" to a matrix analogous to the output from assignTaxonomy
-taxid <- t(sapply(ids, function(x) {
-        m <- match(ranks, x$rank)
-        taxa <- x$taxon[m]
-        taxa[startsWith(taxa, "unclassified_")] <- NA
-        taxa
-}))
-colnames(taxid) <- ranks; rownames(taxid) <- getSequences(seqtab.nochim)
-```
-
-#evaluate accuracy
+On va utiliser la communauté fictive pour vérifier les variants obtenus avec DADA2.
+D'abord on enlève de la communauté fictive les séquences qui ne sont pas présente dans les données brutes avec la fonction "sort()". Puis on concatène avec la fonction "cat()".
 ```{r}
 unqs.mock <- seqtab.nochim["Mock",]
-unqs.mock <- sort(unqs.mock[unqs.mock>0], decreasing=TRUE) # Drop ASVs absent in the Mock
+unqs.mock <- sort(unqs.mock[unqs.mock>0], decreasing=TRUE) 
 cat("DADA2 inferred", length(unqs.mock), "sample sequences present in the Mock community.\n")
 ```
 
+Maintenant, on compare les deux set de séquences.
 ```{r}
 mock.ref <- getSequences(file.path(path, "HMP_MOCK.v35.fasta"))
 match.ref <- sum(sapply(names(unqs.mock), function(x) any(grepl(x, mock.ref))))
 cat("Of those,", sum(match.ref), "were exact matches to the expected reference sequences.\n")
 ```
+DADA2 a donc identifié 20 séquences qui correspondent à celles du génome de référence, et le taux d'erreur pour cet échantillon est 0%.
+Bien sûr celà n'est pas représentatif d'un cas réel, le taux d'erreur sera plus élevé et toutes les séquences ne corresponderont pas au génome référence.
 
-#bonus:handoff to phyloseq
+# Bonus:handoff to phyloseq
+
+On installe tous les packages nécéssaires.
 ```{r}
 BiocManager::install("phyloseq")
 ```
-
 ```{r}
 library(phyloseq); packageVersion("phyloseq")
 ```
-
 ```{r}
 library(Biostrings); packageVersion("Biostrings")
 ```
-
 ```{r}
 library(ggplot2); packageVersion("ggplot2")
 ```
 
+## Import dans phyloseq
+Après avoir chargé les packages nécéssaires, on applique le thème "bw".
 ```{r}
 theme_set(theme_bw())
 ```
 
+Puis on construit un échantillon avec la fonction "data.frame()". Normalement on utilise les données d'un fichier, ici on les a inventés.
 ```{r}
 samples.out <- rownames(seqtab.nochim)
 subject <- sapply(strsplit(samples.out, "D"), `[`, 1)
@@ -193,6 +225,8 @@ samdf$When[samdf$Day>100] <- "Late"
 rownames(samdf) <- samples.out
 ```
 
+Avec la fonction "phyloseq()" on construit l'objet "ps" qui va contenir la table d'OTU, les données des échantillons, et le tableau taxonomique.
+Puis on enlève les échantillons "Mocks" pour simuler un filtrage avec la fonction "prune_samples()".
 ```{r}
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
                sample_data(samdf), 
@@ -200,6 +234,7 @@ ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE),
 ps <- prune_samples(sample_names(ps) != "Mock", ps) # Remove mock sample
 ```
 
+On créé des diminutifs aux noms des séquences en liant les noms de taxons aux séquences avec la fonction "merge_phyloseq()", puis en raccouricissant ces noms.
 ```{r}
 dna <- Biostrings::DNAStringSet(taxa_names(ps))
 names(dna) <- taxa_names(ps)
@@ -208,27 +243,34 @@ taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
 ps
 ```
 
+## Vizualisation de l'alpha-diversité
+On trace les graphiques d'alpha-diversité, indices de Shannon et Simpson, avec la fonction "plot_richness()".
 ```{r}
 plot_richness(ps, x="Day", measures=c("Shannon", "Simpson"), color="When")
 ```
-#No obvious systematic difference in alpha-diversity between early and late samples.
+Les deux indices ne montrent pas de différence notable entre les échantillons à 0 jour et à 150 jours.
 
+## Ordination
+On transforme les données à des proportions adaptées aux distances de Bray-Curtis avec la fonction "transform_sample_counts()".
+Ensuite on fait une ordination NMDS avec la fonction "ordinate()".
 ```{r}
 # Transform data to proportions as appropriate for Bray-Curtis distances
 ps.prop <- transform_sample_counts(ps, function(otu) otu/sum(otu))
 ord.nmds.bray <- ordinate(ps.prop, method="NMDS", distance="bray")
 ```
 
+Puis on trace le graphique avec la fonction "plot_ordination()".
 ```{r}
 plot_ordination(ps.prop, ord.nmds.bray, color="When", title="Bray NMDS")
 ```
-#Ordination picks out a clear separation between the early and late samples.
+On observe un nette séparation entre les échantillons tôts et tards.
 
+## Histogramme
+On trace l'histogramme avec la fonction "plot_bar()" des familles en fonction de l'abondance et des jours.
 ```{r}
 top20 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:20]
 ps.top20 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
 ps.top20 <- prune_taxa(top20, ps.top20)
 plot_bar(ps.top20, x="Day", fill="Family") + facet_wrap(~When, scales="free_x")
 ```
-#Nothing glaringly obvious jumps out from the taxonomic distribution of the top 20 sequences to explain the early-late differentiation.
-
+On ne peut rien observer dans la distribution taxonomique des 20 premières séquences qui pourrait expliquer le résultat de l'ordination.
